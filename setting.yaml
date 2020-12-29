@@ -1,0 +1,27 @@
+controllables:
+  - CRIM
+y_name: PRICE
+id:
+  - ID
+model_path: What_if_tool/data/model.pkl
+train_data_path: What_if_tool/data/train.csv
+decision_path: What_if_tool/data/decision_values.csv
+shap_path: What_if_tool/data/shap_values.csv
+explainer_path: What_if_tool/data/explainer.pkl
+description_path: What_if_tool/description.html
+history_path: What_if_tool/data/history.csv
+target: 30
+step_dict:
+  CRIM: 0.00001
+  ZN: 0.5
+  INDUS: 0.01
+  CHAS: 1
+  NOX: 0.001
+  RM: 0.01
+  AGE: 0.1
+  DIS: 0.0001
+  RAD: 1
+  TAX: 1
+  PTRATIO: 0.1
+  B: 0.01
+  LSTAT: 0.01
