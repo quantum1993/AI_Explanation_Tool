@@ -339,10 +339,11 @@ class WhatIfTool:
     def get_history_module(self):
         self.history_dict = {k: list(self.history[k]) for k in self.config['controllables']}
         self.history_dict['pred.'] = [''] * len(self.history)
-        self.history_dict['imple.'] = ['V'] * len(self.history)
+        # self.history_dict['imple.'] = ['V'] * len(self.history)
         self.his_table_source = ColumnDataSource(self.history_dict)
         cols = [TableColumn(field=k, title=k) for k in self.config['controllables']]
-        cols.extend([TableColumn(field='pred.', title='pred.'), TableColumn(field='imple.', title='imple.')])
+        # cols.extend([TableColumn(field='pred.', title='pred.'), TableColumn(field='imple.', title='imple.')])
+        cols.extend([TableColumn(field='pred.', title='pred.')])
         his_table = DataTable(source=self.his_table_source, columns=cols,
                               width=200, height=800, editable=True, reorderable=False)
         title = Div(text='History', sizing_mode="stretch_width",
