@@ -49,3 +49,16 @@ body {
 .bk-root .slick-header.ui-state-default{
     border-left-color: #D3D3D3
 }
+.bk-root .noUi-touch-area{
+    background-color: #21618C !important
+}
+.bk-root .noUi-connects{
+    background-color: #555555 !important
+}
+.bk-root .noUi-connect{
+    background-color: #555555 !important
+}
+.bk-root .bk-input{
+    background-color: #555555 !important;
+    color: #FDFEFE;
+}
