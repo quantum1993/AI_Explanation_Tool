@@ -71,6 +71,7 @@ class WhatIfTool:
         self.slider_dict_uncon, self.slider_dict_con = None, None
         self.text_dict_uncon, self.text_dict_con = None, None
         self.p1_mapper, self.c1_mapper, self.mapper = None, None, None
+        self.color_df, self.bins = None, None
         self.history_dict, self.record_table = None, None
         self.table_panel = list()
         self.uncon_panel = list()
@@ -168,22 +169,49 @@ class WhatIfTool:
                              [list(self.decision_values[cols[-1]].values)]
         data["decision_y"] = [list(self.decision_values["y_pos"].values)] * len(data["decision_x"])
         data["index"] = list(x_data.index.values) + [x_data.index.values[-1] + 1]
-        data['attr'] = ['Train'] * len(self.df) + ['Test']
+        # data['attr'] = ['Train'] * len(self.df) + ['Test']
         data['status'] = ['Train'] * len(self.df) + ['Test']
-        data['color'] = self.get_line_color(list(data[self.y_pred_name]))
-        #data['data_index'] = np.arange(len(data["decision_x"]))
+        cmap = plt.get_cmap('RdYlBu')
+        y_min, y_max = np.min(data[self.y_pred_name]), np.max(data[self.y_pred_name])
+        color_list = [mc.rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
+        self.color_df, self.bins = self.get_color_bins(y_min, y_max, color_list)
+        data['color'] = ['#555555'] * len(self.df) + self.get_line_color([self.y_pred[-1]])
         source = ColumnDataSource(data.to_dict(orient='list'))
         return source, data
 
+    @staticmethod
+    def get_color_bins(y_min, y_max, color_list):
+        df = pd.DataFrame()
+        df['a'] = np.linspace(start=y_min, stop=y_max, num=len(color_list))
+        df['bucket'], bins = pd.cut(df['a'], bins=len(color_list), retbins=True)
+        df['color'] = color_list
+        return df, bins
+
+    # def get_line_color(self, y_pred):
+        # num = len(y_pred)
+        # y_ind_list = list(range(num))
+        # color_list = self.get_color_bins(num)
+        # _, y_ind_list = (list(t) for t in
+        #                  zip(*sorted(zip(y_pred, y_ind_list))))  # sort by y_pred_list and return y_ind_list
+        # _, color_list = (list(t) for t in
+        #                  zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
+        # return color_list
+
     def get_line_color(self, y_pred):
-        num = len(y_pred)
-        y_ind_list = list(range(num))
-        color_list = self.get_color_bins(num)
-        _, y_ind_list = (list(t) for t in
-                         zip(*sorted(zip(y_pred, y_ind_list))))  # sort by y_pred_list and return y_ind_list
-        _, color_list = (list(t) for t in
-                         zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
-        return color_list
+        tmp_df = pd.DataFrame()
+        tmp_df['y_pred'] = y_pred
+        tmp_df['bucket'] = pd.cut(tmp_df['y_pred'], bins=self.bins, retbins=False)
+        tmp_df = pd.merge(left=tmp_df, right=self.color_df, on='bucket', how='left')
+        mask = (tmp_df['bucket'].isna()) & (tmp_df['y_pred'] <= self.color_df['a'].min())
+        tmp_df.loc[mask, 'color'] = tmp_df.loc[mask, 'color'].fillna(self.color_df.loc[0, 'color'])
+        mask = (tmp_df['bucket'].isna()) & (tmp_df['y_pred'] >= self.color_df['a'].max())
+        tmp_df.loc[mask, 'color'] = tmp_df.loc[mask, 'color'].fillna(self.color_df.loc[len(self.color_df)-1, 'color'])
+        # print(tmp_df.tail())
+        return list(tmp_df['color'])
+
+    def get_train_test_line_color(self, source_df):
+        train_len = len(source_df[source_df['status'] == 'Train'])
+        return ['#555555'] * train_len + self.get_line_color(source_df[self.y_pred_name][train_len:])
 
     def get_uncontrollable_module(self):
         self.slider_dict_uncon = dict()
@@ -280,31 +308,32 @@ class WhatIfTool:
         tmp_df["decision_y"] = [self.source_df["decision_y"].values[-1] * len(x_data)]
         tmp_df["index"] = list(x_data.index.values + self.source_df["index"].values[-1] + 1)
         # tmp_df["attr"] = ['Test_{}'.format(x) for x in tmp_df["index"]]
-        tmp_df["attr"] = ['Test1'] * len(x_data)
+        # tmp_df["attr"] = ['Test1'] * len(x_data)
         tmp_df['status'] = ['Test'] * len(x_data)
+        tmp_df2 = pd.concat([self.source_df[[self.y_pred_name, 'status']], tmp_df[[self.y_pred_name, 'status']]])
+        tmp_df['color'] = self.get_train_test_line_color(tmp_df2)[-len(x_data):]
 
-        #self.source_df = self.source_df.drop(self.source_df.tail(1).index)  # drop last row
         self.source_df = self.source_df.append(tmp_df).reset_index(drop=True)
         self.source.data = self.source_df.to_dict(orient='list')
-        self.new_mapper()
+        # self.new_mapper()
         # https://stackoverflow.com/questions/54428355/bokeh-plot-not-updating
         # https://stackoverflow.com/questions/59041774/bokeh-server-plot-not-updating-as-wanted-also-it-keeps-shifting-and-axis-inform
 
-    def new_mapper(self):
-        tmp_df = self.source_df[self.source_df['status'] != 'Train']
-        test_list = list(tmp_df['attr'])
-        test_list = [str(x) for x in test_list]
-        y_pred_list = list(tmp_df[self.y_pred_name])
-        test_num = len(y_pred_list)
-        y_ind_list = list(range(test_num))
-        color_list = self.get_color_bins(test_num)
-        _, y_ind_list = (list(t) for t in zip(*sorted(zip(y_pred_list, y_ind_list))))  # sort by y_pred_list and return y_ind_list
-        _, color_list = (list(t) for t in zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
-        cat = ['Train'] + test_list
-        cat_color = ['#555555'] + color_list
-        self.p1_mapper = factor_cmap('attr', cat_color, cat)
-        cat_color = ['#555555', 'orange']
-        self.c1_mapper = factor_cmap('attr', cat_color, cat)
+    # def new_mapper(self):
+    #     tmp_df = self.source_df[self.source_df['status'] != 'Train']
+    #     test_list = list(tmp_df['attr'])
+    #     test_list = [str(x) for x in test_list]
+    #     y_pred_list = list(tmp_df[self.y_pred_name])
+    #     test_num = len(y_pred_list)
+    #     y_ind_list = list(range(test_num))
+    #     color_list = self.get_color_bins(test_num)
+    #     _, y_ind_list = (list(t) for t in zip(*sorted(zip(y_pred_list, y_ind_list))))  # sort by y_pred_list and return y_ind_list
+    #     _, color_list = (list(t) for t in zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
+    #     cat = ['Train'] + test_list
+    #     cat_color = ['#555555'] + color_list
+    #     self.p1_mapper = factor_cmap('attr', cat_color, cat)
+    #     cat_color = ['#555555', 'orange']
+    #     self.c1_mapper = factor_cmap('attr', cat_color, cat)
 
     def get_history_module(self):
         self.history_dict = {k: list(self.history[k]) for k in self.config['controllables']}
@@ -445,25 +474,25 @@ class WhatIfTool:
         obj.yaxis.minor_tick_line_color = self.txt_color
         return obj
 
-    @staticmethod
-    def get_color_bins(n):
-        cmap = plt.get_cmap('RdYlBu')
-        color_list = [mc.rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
-        color_dict = {ind: color for ind, color in enumerate(color_list)}
-        # cmap.N = 256 in RdYlBu
-        if n == cmap.N:
-            return color_list
-        elif n > cmap.N:
-            left = n % cmap.N
-            tmp_list = list(range(cmap.N))
-            tmp_list = tmp_list + tmp_list[:left]
-            tmp_list.sort()
-            return [color_dict[x] for x in tmp_list]
-        else:
-            tmp_list = np.random.uniform(low=0, high=cmap.N-1, size=n)
-            tmp_list = [int(x) for x in tmp_list]
-            tmp_list.sort()
-            return [color_dict[x] for x in tmp_list]
+    # @staticmethod
+    # def get_color_bins(n):
+    #     cmap = plt.get_cmap('RdYlBu')
+    #     color_list = [mc.rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
+    #     color_dict = {ind: color for ind, color in enumerate(color_list)}
+    #     # cmap.N = 256 in RdYlBu
+    #     if n == cmap.N:
+    #         return color_list
+    #     elif n > cmap.N:
+    #         left = n % cmap.N
+    #         tmp_list = list(range(cmap.N))
+    #         tmp_list = tmp_list + tmp_list[:left]
+    #         tmp_list.sort()
+    #         return [color_dict[x] for x in tmp_list]
+    #     else:
+    #         tmp_list = np.random.uniform(low=0, high=cmap.N-1, size=n)
+    #         tmp_list = [int(x) for x in tmp_list]
+    #         tmp_list.sort()
+    #         return [color_dict[x] for x in tmp_list]
 
     def get_y_module(self):
         p2 = figure(title="Prediction Result", tools=self.tools, tooltips=self.tooltips, plot_width=500, plot_height=200)
@@ -502,7 +531,9 @@ class WhatIfTool:
                     x_axis_location='above', y_range=(y_range_min,
                                                       self.decision_values["y_pos"].max()))
         p1 = self.get_attribute(p1)
-        c2 = p1.multi_line(xs='decision_x', ys='decision_y', source=self.source, color=self.p1_mapper, line_width=1.5,
+        # c2 = p1.multi_line(xs='decision_x', ys='decision_y', source=self.source, color=self.p1_mapper, line_width=1.5,
+        #                    name='decision plot')
+        c2 = p1.multi_line(xs='decision_x', ys='decision_y', source=self.source, line_color='color', line_width=1.5,
                            name='decision plot')
         c2.nonselection_glyph = MultiLine(line_color='#555555', line_alpha=0.2, line_width=1.5)
         c2.selection_glyph = MultiLine(line_color=self.mapper, line_width=1.5)
@@ -526,7 +557,8 @@ class WhatIfTool:
             tmp_p = self.get_attribute(tmp_p)
             c1 = tmp_p.circle(col, "dependence_" + col, source=self.source, name="dep_" + col, size=3.5,
                               # color="ForestGreen")
-                              color=self.c1_mapper)
+                              # color=self.c1_mapper)
+                              color='color')
             c1.nonselection_glyph = Circle(fill_color='gray', fill_alpha=0.2, line_color=None, size=5)
             c1.selection_glyph = Circle(fill_color='orange', line_color=None, size=10, line_width=15)
             dep_picture.append(tmp_p)
