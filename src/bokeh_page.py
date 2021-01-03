@@ -170,9 +170,20 @@ class WhatIfTool:
         data["index"] = list(x_data.index.values) + [x_data.index.values[-1] + 1]
         data['attr'] = ['Train'] * len(self.df) + ['Test']
         data['status'] = ['Train'] * len(self.df) + ['Test']
+        data['color'] = self.get_line_color(list(data[self.y_pred_name]))
         #data['data_index'] = np.arange(len(data["decision_x"]))
         source = ColumnDataSource(data.to_dict(orient='list'))
         return source, data
+
+    def get_line_color(self, y_pred):
+        num = len(y_pred)
+        y_ind_list = list(range(num))
+        color_list = self.get_color_bins(num)
+        _, y_ind_list = (list(t) for t in
+                         zip(*sorted(zip(y_pred, y_ind_list))))  # sort by y_pred_list and return y_ind_list
+        _, color_list = (list(t) for t in
+                         zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
+        return color_list
 
     def get_uncontrollable_module(self):
         self.slider_dict_uncon = dict()
@@ -287,12 +298,10 @@ class WhatIfTool:
         test_num = len(y_pred_list)
         y_ind_list = list(range(test_num))
         color_list = self.get_color_bins(test_num)
-        _, y_ind_list = (list(t) for t in zip(*sorted(zip(y_pred_list, y_ind_list))))
-        _, color_list = (list(t) for t in zip(*sorted(zip(y_ind_list, color_list))))
+        _, y_ind_list = (list(t) for t in zip(*sorted(zip(y_pred_list, y_ind_list))))  # sort by y_pred_list and return y_ind_list
+        _, color_list = (list(t) for t in zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
         cat = ['Train'] + test_list
         cat_color = ['#555555'] + color_list
-        print(self.source_df[['attr']].tail())
-        print(cat, cat_color)
         self.p1_mapper = factor_cmap('attr', cat_color, cat)
         cat_color = ['#555555', 'orange']
         self.c1_mapper = factor_cmap('attr', cat_color, cat)
@@ -441,6 +450,7 @@ class WhatIfTool:
         cmap = plt.get_cmap('RdYlBu')
         color_list = [mc.rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
         color_dict = {ind: color for ind, color in enumerate(color_list)}
+        # cmap.N = 256 in RdYlBu
         if n == cmap.N:
             return color_list
         elif n > cmap.N:
@@ -524,8 +534,8 @@ class WhatIfTool:
 
     def get_plot_module(self):
         self.y_plot_panel = self.get_y_module()
-        self.get_mapper()
-        self.new_mapper()
+        #self.get_mapper()
+        #self.new_mapper()
         self.decision_panel = self.get_decision_module()
         self.dep_panel = self.get_dep_module()
 
