@@ -58,7 +58,7 @@ class WhatIfTool:
         self.idx_names, self.split_loc = None, None
         self.model, self.config = None, None
         self.y_plot_panel, self.decision_panel, self.dep_panel = None, None, None
-        self.shap_values, self.explainer, self.decision_values = None, None, None
+        self.shap_values, self.explainer, self.decision_values, self.impo_list = None, None, None, None
         self.source, self.source_df = None, None
         self.his_table_source, self.record_table_source = None, None
         self.drop_cols = None
@@ -101,6 +101,8 @@ class WhatIfTool:
         self.shap_values = pd.read_csv(self.config['shap_path'])
         self.explainer = load_pickle(self.config['explainer_path'])
         self.decision_values = pd.read_csv(self.config['decision_path'])
+        self.impo_list = list(self.decision_values['parameters'])
+        self.impo_list.remove('Base')
         self.history = pd.read_csv(self.config['history_path'])
         # self.df = self.astype(self.df)
         self.create_new_id()
@@ -288,16 +290,16 @@ class WhatIfTool:
         shap_values = self.explainer.shap_values(x_data)
         idx_names = ['new_' + str(i) for i in range(len(x_data))]
         df_shap = pd.DataFrame(data=shap_values, columns=x_data.columns)
-        importance_list = get_importance_list(df_shap).Features.to_list()
+        # importance_list = get_importance_list(df_shap).Features.to_list()
         decision_values = decision_value_core(df_shap, self.explainer.expected_value,
                                               idx_names=idx_names,
-                                              importance_list=importance_list)
+                                              importance_list=self.impo_list)
         return df_shap, decision_values, idx_names
 
     def pred_click_plot(self, x_data, y_pred, df_shap, decision_values, idx_names):
         self.source_df = self.source_df[self.source_df['status'] != 'Test'].reset_index(drop=True)
         tmp_df = pd.DataFrame()
-        tmp_df["ID"] = [idx_names]
+        tmp_df["ID"] = idx_names
         for col in x_data.columns:
             tmp_df[col] = x_data[col].values
             tmp_df["dependence_" + col] = get_dependence_values(col, df_shap)
@@ -312,7 +314,6 @@ class WhatIfTool:
         tmp_df['status'] = ['Test'] * len(x_data)
         tmp_df2 = pd.concat([self.source_df[[self.y_pred_name, 'status']], tmp_df[[self.y_pred_name, 'status']]])
         tmp_df['color'] = self.get_train_test_line_color(tmp_df2)[-len(x_data):]
-
         self.source_df = self.source_df.append(tmp_df).reset_index(drop=True)
         self.source.data = self.source_df.to_dict(orient='list')
         # self.new_mapper()
@@ -367,10 +368,6 @@ class WhatIfTool:
         # https://stackoverflow.com/questions/54426404/bokeh-datatable-return-row-and-column-on-selection-callback
         self.record_cols = [*list(self.df.columns), 'exp', 'delete', 'his_pred', self.y_pred_name, 'index']
         self.record_table = pd.DataFrame(columns=self.record_cols)
-        # for col in self.df.columns:
-        #     self.record_table[col] = []
-        # self.record_table['exp'] = []
-        # self.record_table['delete'] = []
         self.record_table_source = ColumnDataSource(self.record_table[['exp', 'delete']].to_dict(orient='list'))
         cols = [TableColumn(field="exp", title="Exp."),
                 TableColumn(field="delete", title="Delete")]
@@ -401,7 +398,7 @@ class WhatIfTool:
         record_button = Button(label="Take a snapshot", button_type="success", width_policy='fit', width=150)
         record_button.on_click(self.record)
         self.table_panel.append(title)
-        self.table_panel.append(test_cell)
+        # self.table_panel.append(test_cell)
         self.table_panel.append(record_button)
         self.table_panel.append(data_table)
 
