@@ -68,6 +68,7 @@ class WhatIfTool:
         self.history = None
         self.correct_order = None
         self.pred_text = None
+        self.record_cols = None
         self.slider_dict_uncon, self.slider_dict_con = None, None
         self.text_dict_uncon, self.text_dict_con = None, None
         self.p1_mapper, self.c1_mapper, self.mapper = None, None, None
@@ -189,16 +190,6 @@ class WhatIfTool:
         df['color'] = color_list
         return df, bins
 
-    # def get_line_color(self, y_pred):
-        # num = len(y_pred)
-        # y_ind_list = list(range(num))
-        # color_list = self.get_color_bins(num)
-        # _, y_ind_list = (list(t) for t in
-        #                  zip(*sorted(zip(y_pred, y_ind_list))))  # sort by y_pred_list and return y_ind_list
-        # _, color_list = (list(t) for t in
-        #                  zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
-        # return color_list
-
     def get_line_color(self, y_pred):
         tmp_df = pd.DataFrame()
         tmp_df['y_pred'] = y_pred
@@ -316,25 +307,8 @@ class WhatIfTool:
         tmp_df['color'] = self.get_train_test_line_color(tmp_df2)[-len(x_data):]
         self.source_df = self.source_df.append(tmp_df).reset_index(drop=True)
         self.source.data = self.source_df.to_dict(orient='list')
-        # self.new_mapper()
         # https://stackoverflow.com/questions/54428355/bokeh-plot-not-updating
         # https://stackoverflow.com/questions/59041774/bokeh-server-plot-not-updating-as-wanted-also-it-keeps-shifting-and-axis-inform
-
-    # def new_mapper(self):
-    #     tmp_df = self.source_df[self.source_df['status'] != 'Train']
-    #     test_list = list(tmp_df['attr'])
-    #     test_list = [str(x) for x in test_list]
-    #     y_pred_list = list(tmp_df[self.y_pred_name])
-    #     test_num = len(y_pred_list)
-    #     y_ind_list = list(range(test_num))
-    #     color_list = self.get_color_bins(test_num)
-    #     _, y_ind_list = (list(t) for t in zip(*sorted(zip(y_pred_list, y_ind_list))))  # sort by y_pred_list and return y_ind_list
-    #     _, color_list = (list(t) for t in zip(*sorted(zip(y_ind_list, color_list))))  # sort by y_ind_list and return color_list
-    #     cat = ['Train'] + test_list
-    #     cat_color = ['#555555'] + color_list
-    #     self.p1_mapper = factor_cmap('attr', cat_color, cat)
-    #     cat_color = ['#555555', 'orange']
-    #     self.c1_mapper = factor_cmap('attr', cat_color, cat)
 
     def get_history_module(self):
         self.history_dict = {k: list(self.history[k]) for k in self.config['controllables']}
@@ -472,26 +446,6 @@ class WhatIfTool:
         obj.yaxis.minor_tick_line_color = self.txt_color
         return obj
 
-    # @staticmethod
-    # def get_color_bins(n):
-    #     cmap = plt.get_cmap('RdYlBu')
-    #     color_list = [mc.rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
-    #     color_dict = {ind: color for ind, color in enumerate(color_list)}
-    #     # cmap.N = 256 in RdYlBu
-    #     if n == cmap.N:
-    #         return color_list
-    #     elif n > cmap.N:
-    #         left = n % cmap.N
-    #         tmp_list = list(range(cmap.N))
-    #         tmp_list = tmp_list + tmp_list[:left]
-    #         tmp_list.sort()
-    #         return [color_dict[x] for x in tmp_list]
-    #     else:
-    #         tmp_list = np.random.uniform(low=0, high=cmap.N-1, size=n)
-    #         tmp_list = [int(x) for x in tmp_list]
-    #         tmp_list.sort()
-    #         return [color_dict[x] for x in tmp_list]
-
     def get_y_module(self):
         p2 = figure(title="Prediction Result", tools=self.tools, tooltips=self.tooltips, plot_width=500, plot_height=200)
         p2 = self.get_attribute(p2)
@@ -564,8 +518,6 @@ class WhatIfTool:
 
     def get_plot_module(self):
         self.y_plot_panel = self.get_y_module()
-        #self.get_mapper()
-        #self.new_mapper()
         self.decision_panel = self.get_decision_module()
         self.dep_panel = self.get_dep_module()
 
