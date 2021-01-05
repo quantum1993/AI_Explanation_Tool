@@ -50,8 +50,8 @@ body {
     border-left-color: #D3D3D3
 }
 .bk-root .noUi-touch-area{
-    background-color: #21618C !important;
-    border-color: #555555 !important;
+    background-color: #3b3b3b !important;
+    border-color: #3b3b3b !important;
 }
 .bk-root .noUi-connects{
     background-color: #555555 !important;
@@ -63,6 +63,6 @@ body {
 }
 .bk-root .bk-input{
     background-color: #555555 !important;
-    border-color: #555555; !important;
+    border-color: #555555 !important;
     color: #FDFEFE;
 }
