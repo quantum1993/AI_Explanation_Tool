@@ -179,6 +179,7 @@ class WhatIfTool:
         color_list = [mc.rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
         self.color_df, self.bins = self.get_color_bins(y_min, y_max, color_list)
         data['color'] = ['#555555'] * len(self.df) + self.get_line_color([self.y_pred[-1]])
+        data['color_select'] = self.get_line_color(data[self.y_pred_name])
         source = ColumnDataSource(data.to_dict(orient='list'))
         return source, data
 
@@ -461,7 +462,7 @@ class WhatIfTool:
 
         c2 = p2.circle('index', self.y_pred_name, source=self.source, name="pred Y", size=5, color="#C9C462")
         c2.nonselection_glyph = Circle(fill_color="#C9C462", fill_alpha=0.2, line_color=None, size=5)
-        vline = Span(location=self.split_loc, dimension='height', line_color='SeaGreen', line_width=3)
+        vline = Span(location=self.split_loc, dimension='height', line_color='seagreen', line_width=3)
         p2.add_layout(vline)
         p2.legend.location = "top_left"
         p2.legend.click_policy = "hide"
@@ -488,7 +489,8 @@ class WhatIfTool:
         c2 = p1.multi_line(xs='decision_x', ys='decision_y', source=self.source, line_color='color', line_width=1.5,
                            name='decision plot')
         c2.nonselection_glyph = MultiLine(line_color='#555555', line_alpha=0.2, line_width=1.5)
-        c2.selection_glyph = MultiLine(line_color=self.mapper, line_width=1.5)
+        c2.selection_glyph = MultiLine(line_color='color_select', line_width=1.5)
+        # c2.selection_glyph = MultiLine(line_color=self.mapper, line_width=1.5)
         # c2.selection_glyph = MultiLine(line_color='orange', line_width=2)
         y_pos = self.decision_values["y_pos"].values - 0.5
         y_pos = y_pos[:-1]
@@ -559,7 +561,7 @@ class WhatIfTool:
             [tabs]
         ], sizing_mode="scale_both")
         curdoc().add_root(l)
-        curdoc().title = "What-if tool"
+        curdoc().title = "AI Explanation Tool"
 
     @staticmethod
     def update_text(slider_d, text_d, column_name):
