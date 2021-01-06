@@ -43,6 +43,9 @@ body {
     background-image: none !important;
     color:#D3D3D3 !important;
 }
+.bk-root .slick-cell{
+    border-color: #D3D3D3 !important;
+}
 .bk-root .noUi-touch-area{
     background-color: #3b3b3b !important;
     border-color: #3b3b3b !important;
