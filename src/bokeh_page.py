@@ -200,7 +200,6 @@ class WhatIfTool:
         tmp_df.loc[mask, 'color'] = tmp_df.loc[mask, 'color'].fillna(self.color_df.loc[0, 'color'])
         mask = (tmp_df['bucket'].isna()) & (tmp_df['y_pred'] >= self.color_df['a'].max())
         tmp_df.loc[mask, 'color'] = tmp_df.loc[mask, 'color'].fillna(self.color_df.loc[len(self.color_df)-1, 'color'])
-        # print(tmp_df.tail())
         return list(tmp_df['color'])
 
     def get_train_test_line_color(self, source_df):
@@ -412,6 +411,7 @@ class WhatIfTool:
         self.record_in_table()
 
     def record_in_table(self):
+        # only record those 'test' status and assign them as 'Record'
         if 'Test' in self.source_df['status'].unique():
             tmp_df = pd.DataFrame()
             for col in self.record_cols:
@@ -420,14 +420,17 @@ class WhatIfTool:
                 elif col == 'his_pred':
                     tmp_df[col] = [list(self.history_dict['pred.'])]
             if len(self.record_table['exp'].tail(1)) == 0:
-                tmp_df['exp'] = ['exp_00']
+                str_ind = 'exp_00'
             else:
                 num = int(self.record_table['exp'].tail(1).values[0][-2:])
-                tmp_df['exp'] = ['exp_{0:02d}'.format(num+1)]
+                str_ind = 'exp_{0:02d}'.format(num + 1)
+            tmp_df['exp'] = str_ind
             tmp_df['delete'] = ['X']
             self.record_table = self.record_table.append(tmp_df)
             self.record_table_source.data = self.record_table[['exp', 'delete']].to_dict(orient='list')
+            self.source_df.loc[self.source_df['status'] == 'Test', 'ID'] = str_ind
             self.source_df['status'] = self.source_df['status'].str.replace('Test', 'Record')
+            self.source.data = self.source_df.to_dict(orient='list')
 
     def get_attribute(self, obj):
         obj.title.text_font_size = '11pt'
