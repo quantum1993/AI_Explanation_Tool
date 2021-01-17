@@ -97,12 +97,11 @@ class WhatIfTool:
     def get_basic_files(self):
         self.config = load_yaml(self.config_path)
         self.df = pd.read_csv(self.config['train_data_path'])
-        self.correct_order = list(self.df.columns)
         self.step_dict = self.config['step_dict']
-        self.target = self.config['target']
         self.model = load_pickle(self.config['model_path'])
         self.group_idx_name = "_".join(self.config['id'])
         self.shap_values = pd.read_csv(self.config['shap_path'])
+        self.correct_order = list(self.shap_values.columns)
         self.explainer = load_pickle(self.config['explainer_path'])
         self.decision_values = pd.read_csv(self.config['decision_path'])
         self.impo_list = list(self.decision_values['parameters'])
@@ -123,7 +122,7 @@ class WhatIfTool:
     def get_pred_y(self):
         self.df_z = self.data_transform(self.df)
         self.drop_cols = [self.config['y_name'], self.group_idx_name]
-        y_pred_z = self.model_predict(self.model, self.df_z.drop(self.drop_cols, axis=1))
+        y_pred_z = self.model_predict(self.model, self.df_z.drop(self.drop_cols, axis=1)[self.correct_order])
         self.y_pred = self.data_inv_transform(pd.DataFrame(data=y_pred_z, columns=[self.config['y_name']]),
                                               col=self.config['y_name']).values.flatten()
 
@@ -132,16 +131,22 @@ class WhatIfTool:
             df[col] = df[col].astype('str')
         return df
 
-    @staticmethod
-    def data_transform(data, col: list = None):
+    #@staticmethod
+    def data_transform(self, data, col: list = None):
         '''one can transform their data in this function
         col: the columns desired to be transformed, must be list, if None, then all cols will be transformed
         '''
+        for _col in data.columns:
+            if _col in self.config['cat'].keys():
+                tmp = data[_col].apply(lambda x: pd.Series(data=self.config['cat'][_col]['cat_map'][x],
+                                                           index=self.config['cat'][_col]['cat_cols']))
+                data = pd.concat([data, tmp], axis=1)
+                data = data.drop(_col, axis=1)
         data_z = data
         return data_z
 
-    @staticmethod
-    def data_inv_transform(data_z, col: list = None):
+    #@staticmethod
+    def data_inv_transform(self, data_z, col: list = None):
         '''one can inverse transform their data in this function
         col: the columns desired to be inverse transformed, must be list, if None, then all cols will be inverse transformed
         '''
@@ -159,13 +164,26 @@ class WhatIfTool:
     def create_source(self):
         data = pd.DataFrame()
         x_data = self.df.drop(self.config['y_name'], axis=1)
-        for col in x_data.columns:
+        x_data_z = self.df_z.drop(self.config['y_name'], axis=1)
+        cols = list(set(list(x_data.columns) + list(x_data_z)))
+        for col in cols:
             if col == self.group_idx_name:
                 data["ID"] = list(x_data[col].values) + ['new_0']
             else:
-                data[col] = list(x_data[col].values) + [x_data[col].values[-1]]
-                dep = get_dependence_values(col, self.shap_values)
-                data["dependence_" + col] = list(dep) + [dep[-1]]
+                if col in x_data.columns:
+                    data[col] = list(x_data[col].values) + [x_data[col].values[-1]]
+                else:
+                    data[col] = list(x_data_z[col].values) + [x_data_z[col].values[-1]]
+
+                if col in self.shap_values.columns:
+                    dep = get_dependence_values(col, self.shap_values)
+                    data["dependence_" + col] = list(dep) + [dep[-1]]
+
+        # for col in list(set(self.df_z.drop(self.config['y_name'], axis=1)) - set(x_data.columns)):
+        #     if col in self.shap_values.columns:
+        #         data[col] = list(x_data[col].values) + [x_data[col].values[-1]]
+        #         dep = get_dependence_values(col, self.shap_values)
+        #         data["dependence_" + col] = list(dep) + [dep[-1]]
 
         data[self.config['y_name']] = list(self.df[self.config['y_name']].values) + \
                                       [self.df[self.config['y_name']].values[-1]]
@@ -217,7 +235,11 @@ class WhatIfTool:
         self.uncon_panel.append(title)
         for col in self.df.columns:
             if col not in [self.config['y_name'], *self.config['id']] and col not in self.config['controllables']:
-                self.cols_core(col, self.slider_dict_uncon, self.text_dict_uncon, self.uncon_panel)
+                if col in self.config['cat'].keys():
+                    cols_core = self.cat_cols_core
+                else:
+                    cols_core = self.cols_core
+                cols_core(col, self.slider_dict_uncon, self.text_dict_uncon, self.uncon_panel)
 
     def get_controllable_module(self):
         self.slider_dict_con = dict()
@@ -226,7 +248,11 @@ class WhatIfTool:
                     style={'font-size': '150%', 'color': self.txt_color})
         self.con_panel.append(title)
         for col in self.config['controllables']:
-            self.cols_core(col, self.slider_dict_con, self.text_dict_con, self.con_panel)
+            if col in self.config['cat'].keys():
+                cols_core = self.cat_cols_core
+            else:
+                cols_core = self.cols_core
+            cols_core(col, self.slider_dict_con, self.text_dict_con, self.con_panel)
         con_button = Button(label="Get Advice", button_type="success", width=150, width_policy='fit')
         self.con_panel.append(con_button)
 
@@ -239,6 +265,18 @@ class WhatIfTool:
                                    background=self.bck_color)
         slider_dict[col].on_change('value', self.update_text(slider_dict, text_dict, col))
         text_dict[col].on_change('value', self.update_slider(slider_dict, text_dict, col))
+        param_panel.append(row(slider_dict[col], text_dict[col]))
+
+    def cat_cols_core(self, col, slider_dict, text_dict, param_panel):
+        cat_list = list(self.config['cat'][col]['cat_map'].keys())
+        slider_dict[col] = Slider(title=col, value=cat_list.index(self.source_df[col].values[-1]),
+                                  start=0, end=len(cat_list)-1,
+                                  step=1, width=120, width_policy='fit', show_value=False,
+                                  margin=(0, 0, 0, 20))
+        text_dict[col] = TextInput(value=str(self.source_df[col].values[-1]), width=80, width_policy='fit',
+                                   background=self.bck_color)
+        slider_dict[col].on_change('value', self.update_text(slider_dict, text_dict, col, cat_list))
+        text_dict[col].on_change('value', self.update_slider(slider_dict, text_dict, col, cat_list))
         param_panel.append(row(slider_dict[col], text_dict[col]))
 
     def get_prediction_module(self):
@@ -268,6 +306,8 @@ class WhatIfTool:
             else:
                 raise KeyError('col not in df: {}'.format(col))
         pred_df = pd.DataFrame(data=[param_values], columns=[x for x in self.df.columns if x not in self.drop_cols])
+        print(pred_df)
+        pred_df = self.data_transform(pred_df)
         return self.model_predict(self.model, pred_df), pred_df
 
     def get_pred_value_in_his(self, pred_df):
@@ -504,7 +544,8 @@ class WhatIfTool:
         p1.yaxis.ticker = y_pos
         p1.yaxis.major_label_overrides = pd.Series(labels, index=y_pos).to_dict()
         p1 = self.get_attribute(p1)
-        vline = Span(location=self.target, dimension='height', line_color='seagreen', line_width=3, line_dash='dashed')
+        vline = Span(location=self.config['target'], dimension='height', line_color='seagreen',
+                     line_width=3, line_dash='dashed')
         p1.add_layout(vline)
         return p1
 
@@ -572,15 +613,23 @@ class WhatIfTool:
         curdoc().title = "AI Explanation Tool"
 
     @staticmethod
-    def update_text(slider_d, text_d, column_name):
-        def update_col_text(attrname, old, new):
-            text_d[column_name].value = str(slider_d[column_name].value)
+    def update_text(slider_d, text_d, column_name, cat_list=None):
+        if cat_list is None:
+            def update_col_text(attrname, old, new):
+                text_d[column_name].value = str(slider_d[column_name].value)
+        else:
+            def update_col_text(attrname, old, new):
+                text_d[column_name].value = str(cat_list[slider_d[column_name].value])
         return update_col_text
 
     @staticmethod
-    def update_slider(slider_d, text_d, column_name):
-        def update_col_slider(attrname, old, new):
-            slider_d[column_name].value = float(text_d[column_name].value)
+    def update_slider(slider_d, text_d, column_name, cat_list=None):
+        if cat_list is None:
+            def update_col_slider(attrname, old, new):
+                slider_d[column_name].value = float(text_d[column_name].value)
+        else:
+            def update_col_slider(attrname, old, new):
+                slider_d[column_name].value = int(cat_list.index(text_d[column_name].value))
         return update_col_slider
 
 # python -m bokeh serve What_if_tool --dev What_if_tool
