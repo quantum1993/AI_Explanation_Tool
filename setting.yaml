@@ -13,10 +13,10 @@ id:
 target: 30
 cat:
   CHAS:
-    cat_cols: CHAS
+    cat_cols: [CHAS_cat]
     cat_map:
-      0: [0]
-      1: [1]
+      A: [0]
+      B: [1]
 step_dict:
   CRIM: 0.00001
   ZN: 0.5
