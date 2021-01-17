@@ -21,20 +21,20 @@ import matplotlib.colors as mc
 import matplotlib.pyplot as plt
 
 
-step_dict = dict()
-step_dict['CRIM'] = 0.00001
-step_dict['ZN'] = 0.5
-step_dict['INDUS'] = 0.01
-step_dict['CHAS'] = 1
-step_dict['NOX'] = 0.001
-step_dict['RM'] = 0.01
-step_dict['AGE'] = 0.1
-step_dict['DIS'] = 0.0001
-step_dict['RAD'] = 1
-step_dict['TAX'] = 1
-step_dict['PTRATIO'] = 0.1
-step_dict['B'] = 0.01
-step_dict['LSTAT'] = 0.01
+# step_dict = dict()
+# step_dict['CRIM'] = 0.00001
+# step_dict['ZN'] = 0.5
+# step_dict['INDUS'] = 0.01
+# step_dict['CHAS'] = 1
+# step_dict['NOX'] = 0.001
+# step_dict['RM'] = 0.01
+# step_dict['AGE'] = 0.1
+# step_dict['DIS'] = 0.0001
+# step_dict['RAD'] = 1
+# step_dict['TAX'] = 1
+# step_dict['PTRATIO'] = 0.1
+# step_dict['B'] = 0.01
+# step_dict['LSTAT'] = 0.01
 
 
 class WhatIfTool:
@@ -54,6 +54,7 @@ class WhatIfTool:
         self.status = 0
 
         # variables
+        self.step_dict = None
         self.df, self.df_z = None, None
         self.idx_names, self.split_loc = None, None
         self.model, self.config = None, None
@@ -97,6 +98,8 @@ class WhatIfTool:
         self.config = load_yaml(self.config_path)
         self.df = pd.read_csv(self.config['train_data_path'])
         self.correct_order = list(self.df.columns)
+        self.step_dict = self.config['step_dict']
+        self.target = self.config['target']
         self.model = load_pickle(self.config['model_path'])
         self.group_idx_name = "_".join(self.config['id'])
         self.shap_values = pd.read_csv(self.config['shap_path'])
@@ -132,7 +135,7 @@ class WhatIfTool:
     @staticmethod
     def data_transform(data, col: list = None):
         '''one can transform their data in this function
-        col: the columns desired to be transformed, must be list
+        col: the columns desired to be transformed, must be list, if None, then all cols will be transformed
         '''
         data_z = data
         return data_z
@@ -140,7 +143,7 @@ class WhatIfTool:
     @staticmethod
     def data_inv_transform(data_z, col: list = None):
         '''one can inverse transform their data in this function
-        col: the columns desired to be inverse transformed, must be list
+        col: the columns desired to be inverse transformed, must be list, if None, then all cols will be inverse transformed
         '''
         data = data_z
         return data
@@ -230,7 +233,7 @@ class WhatIfTool:
     def cols_core(self, col, slider_dict, text_dict, param_panel):
         slider_dict[col] = Slider(title=col, value=self.source_df[col].values[-1],
                                   start=self.df[col].min(), end=self.df[col].max(),
-                                  step=step_dict[col], width=120, width_policy='fit', show_value=False,
+                                  step=self.step_dict[col], width=120, width_policy='fit', show_value=False,
                                   margin=(0, 0, 0, 20))
         text_dict[col] = TextInput(value=str(self.source_df[col].values[-1]), width=80, width_policy='fit',
                                    background=self.bck_color)
@@ -501,6 +504,8 @@ class WhatIfTool:
         p1.yaxis.ticker = y_pos
         p1.yaxis.major_label_overrides = pd.Series(labels, index=y_pos).to_dict()
         p1 = self.get_attribute(p1)
+        vline = Span(location=self.target, dimension='height', line_color='seagreen', line_width=3, line_dash='dashed')
+        p1.add_layout(vline)
         return p1
 
     def get_dep_module(self):
