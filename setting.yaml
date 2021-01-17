@@ -11,6 +11,12 @@ y_name: PRICE
 id:
   - ID
 target: 30
+cat:
+  CHAS:
+    cat_cols: CHAS
+    cat_map:
+      0: [0]
+      1: [1]
 step_dict:
   CRIM: 0.00001
   ZN: 0.5
