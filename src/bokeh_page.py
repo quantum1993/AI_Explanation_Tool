@@ -265,6 +265,9 @@ class WhatIfTool:
             self.slider_dict_con[col].value = advice[col].values[0]
             self.text_dict_con[col].value = "{0:.4f}".format(advice[col].values[0])
 
+    def ga(self):
+        return None, None
+
     def cols_core(self, col, slider_dict, text_dict, param_panel):
         slider_dict[col] = Slider(title=col, value=self.source_df[col].values[-1],
                                   start=self.df[col].min(), end=self.df[col].max(),
