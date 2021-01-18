@@ -19,6 +19,7 @@ from .util import save_pickle, load_pickle, load_yaml, get_dependence_values, de
 import yaml
 import matplotlib.colors as mc
 import matplotlib.pyplot as plt
+pd.set_option('display.max_columns', 50)
 
 
 # step_dict = dict()
@@ -165,7 +166,7 @@ class WhatIfTool:
         data = pd.DataFrame()
         x_data = self.df.drop(self.config['y_name'], axis=1)
         x_data_z = self.df_z.drop(self.config['y_name'], axis=1)
-        cols = list(set(list(x_data.columns) + list(x_data_z)))
+        cols = list(set(list(x_data.columns) + list(x_data_z.columns)))
         for col in cols:
             if col == self.group_idx_name:
                 data["ID"] = list(x_data[col].values) + ['new_0']
@@ -288,11 +289,11 @@ class WhatIfTool:
         self.pred_panel = [title, self.pred_text, pred_button]
 
     def pred_click(self):
-        y_pred, pred_df = self.get_pred_value()
+        y_pred, pred_df, pred_df_z = self.get_pred_value()
         self.pred_text.value = "{0:.4f}".format(y_pred[0])
-        df_shap, decision_values, idx_names = self.get_shap_info(pred_df)
-        self.pred_click_plot(pred_df, y_pred, df_shap, decision_values, idx_names)
-        self.get_pred_value_in_his(pred_df)
+        df_shap, decision_values, idx_names = self.get_shap_info(pred_df_z)
+        self.pred_click_plot(pred_df, pred_df_z, y_pred, df_shap, decision_values, idx_names)
+        self.get_pred_value_in_his(pred_df_z)
 
     def get_pred_value(self):
         param_values = list()
@@ -300,15 +301,14 @@ class WhatIfTool:
             if col in self.drop_cols:
                 continue
             if col in self.slider_dict_con.keys():
-                param_values.append(self.slider_dict_con[col].value)
+                param_values.append(self.text_dict_con[col].value)
             elif col in self.slider_dict_uncon.keys():
-                param_values.append(self.slider_dict_uncon[col].value)
+                param_values.append(self.text_dict_uncon[col].value)
             else:
                 raise KeyError('col not in df: {}'.format(col))
         pred_df = pd.DataFrame(data=[param_values], columns=[x for x in self.df.columns if x not in self.drop_cols])
-        print(pred_df)
-        pred_df = self.data_transform(pred_df)
-        return self.model_predict(self.model, pred_df), pred_df
+        pred_df_z = self.data_transform(pred_df)
+        return self.model_predict(self.model, pred_df_z), pred_df, pred_df_z
 
     def get_pred_value_in_his(self, pred_df):
         pred_list = []
@@ -330,13 +330,23 @@ class WhatIfTool:
                                               importance_list=self.impo_list)
         return df_shap, decision_values, idx_names
 
-    def pred_click_plot(self, x_data, y_pred, df_shap, decision_values, idx_names):
+    def pred_click_plot(self, x_data, x_data_z, y_pred, df_shap, decision_values, idx_names):
         self.source_df = self.source_df[self.source_df['status'] != 'Test'].reset_index(drop=True)
         tmp_df = pd.DataFrame()
         tmp_df["ID"] = idx_names
-        for col in x_data.columns:
-            tmp_df[col] = x_data[col].values
-            tmp_df["dependence_" + col] = get_dependence_values(col, df_shap)
+        cols = list(set(list(x_data.columns) + list(x_data_z.columns)))
+        for col in cols:
+            if col in x_data.columns:
+                tmp_df[col] = x_data[col].values
+            else:
+                tmp_df[col] = x_data_z[col].values
+            if col in df_shap.columns:
+                tmp_df["dependence_" + col] = get_dependence_values(col, df_shap)
+
+        # for col in x_data.columns:
+        #     tmp_df[col] = x_data[col].values
+        #     if col in df_shap.columns:
+        #         tmp_df["dependence_" + col] = get_dependence_values(col, df_shap)
         tmp_df[self.config['y_name']] = np.array([np.nan]*len(x_data))
         cols = [x for x in decision_values.columns if x not in ["y_pos", "parameters"]]
         tmp_df[self.y_pred_name] = y_pred
@@ -348,6 +358,7 @@ class WhatIfTool:
         tmp_df['status'] = ['Test'] * len(x_data)
         tmp_df2 = pd.concat([self.source_df[[self.y_pred_name, 'status']], tmp_df[[self.y_pred_name, 'status']]])
         tmp_df['color'] = self.get_train_test_line_color(tmp_df2)[-len(x_data):]
+        tmp_df['color_select'] = self.get_line_color(tmp_df[self.y_pred_name])
         self.source_df = self.source_df.append(tmp_df).reset_index(drop=True)
         self.source.data = self.source_df.to_dict(orient='list')
         # https://stackoverflow.com/questions/54428355/bokeh-plot-not-updating
@@ -554,10 +565,12 @@ class WhatIfTool:
         subtitle = " (dep. plot)"
         show_list = self.decision_values['parameters'][:self.show_num].to_list()
         show_list.remove('Base')
+        print(show_list)
         for col in show_list:
             tmp_p = figure(title=col + subtitle, tools=self.tools, tooltips=self.tooltips,
                            plot_width=500, plot_height=150)
             tmp_p = self.get_attribute(tmp_p)
+            print(col, "dependence_" + col)
             c1 = tmp_p.circle(col, "dependence_" + col, source=self.source, name="dep_" + col, size=3.5,
                               # color="ForestGreen")
                               # color=self.c1_mapper)
