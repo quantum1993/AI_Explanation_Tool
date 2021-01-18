@@ -255,7 +255,15 @@ class WhatIfTool:
                 cols_core = self.cols_core
             cols_core(col, self.slider_dict_con, self.text_dict_con, self.con_panel)
         con_button = Button(label="Get Advice", button_type="success", width=150, width_policy='fit')
+        con_button.on_click(self.get_advice)
         self.con_panel.append(con_button)
+
+    def get_advice(self):
+        advice, pred_y = self.ga()
+        self.pred_text.value = "{0:.4f}".format(pred_y)
+        for col in advice.columns:
+            self.slider_dict_con[col].value = advice[col].values[0]
+            self.text_dict_con[col].value = "{0:.4f}".format(advice[col].values[0])
 
     def cols_core(self, col, slider_dict, text_dict, param_panel):
         slider_dict[col] = Slider(title=col, value=self.source_df[col].values[-1],
