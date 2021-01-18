@@ -331,7 +331,7 @@ class WhatIfTool:
         return df_shap, decision_values, idx_names
 
     def pred_click_plot(self, x_data, x_data_z, y_pred, df_shap, decision_values, idx_names):
-        self.source_df = self.source_df[self.source_df['status'] != 'Test'].reset_index(drop=True)
+        source_df = self.source_df[self.source_df['status'] != 'Test'].reset_index(drop=True)
         tmp_df = pd.DataFrame()
         tmp_df["ID"] = idx_names
         cols = list(set(list(x_data.columns) + list(x_data_z.columns)))
@@ -353,13 +353,11 @@ class WhatIfTool:
         tmp_df["decision_x"] = [list(decision_values[col].values) for col in cols]
         tmp_df["decision_y"] = [self.source_df["decision_y"].values[-1] * len(x_data)]
         tmp_df["index"] = list(x_data.index.values + self.source_df["index"].values[-1] + 1)
-        # tmp_df["attr"] = ['Test_{}'.format(x) for x in tmp_df["index"]]
-        # tmp_df["attr"] = ['Test1'] * len(x_data)
         tmp_df['status'] = ['Test'] * len(x_data)
         tmp_df2 = pd.concat([self.source_df[[self.y_pred_name, 'status']], tmp_df[[self.y_pred_name, 'status']]])
         tmp_df['color'] = self.get_train_test_line_color(tmp_df2)[-len(x_data):]
         tmp_df['color_select'] = self.get_line_color(tmp_df[self.y_pred_name])
-        self.source_df = self.source_df.append(tmp_df).reset_index(drop=True)
+        self.source_df = source_df.append(tmp_df).reset_index(drop=True)
         self.source.data = self.source_df.to_dict(orient='list')
         # https://stackoverflow.com/questions/54428355/bokeh-plot-not-updating
         # https://stackoverflow.com/questions/59041774/bokeh-server-plot-not-updating-as-wanted-also-it-keeps-shifting-and-axis-inform
@@ -565,19 +563,16 @@ class WhatIfTool:
         subtitle = " (dep. plot)"
         show_list = self.decision_values['parameters'][:self.show_num].to_list()
         show_list.remove('Base')
-        print(show_list)
+        tmp_p = dict()
         for col in show_list:
-            tmp_p = figure(title=col + subtitle, tools=self.tools, tooltips=self.tooltips,
+            tmp_p[col] = figure(title=col + subtitle, tools=self.tools, tooltips=self.tooltips,
                            plot_width=500, plot_height=150)
-            tmp_p = self.get_attribute(tmp_p)
-            print(col, "dependence_" + col)
-            c1 = tmp_p.circle(col, "dependence_" + col, source=self.source, name="dep_" + col, size=3.5,
-                              # color="ForestGreen")
-                              # color=self.c1_mapper)
-                              color='color')
+            tmp_p[col] = self.get_attribute(tmp_p[col])
+            c1 = tmp_p[col].circle(col, "dependence_" + col, source=self.source, name="dep_" + col, size=3.5,
+                                  color='color')
             c1.nonselection_glyph = Circle(fill_color='gray', fill_alpha=0.2, line_color=None, size=5)
             c1.selection_glyph = Circle(fill_color='orange', line_color=None, size=10, line_width=15)
-            dep_picture.append(tmp_p)
+            dep_picture.append(tmp_p[col])
         return dep_picture
 
     def get_plot_module(self):
